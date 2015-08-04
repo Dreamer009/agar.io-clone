@@ -16,7 +16,7 @@ gulp.task('test', ['lint'], function () {
 });
 
 gulp.task('lint', function () {
-  return gulp.src(['**/*.js', '!node_modules/**/*.js', '!bin/**/*.js'])
+  return gulp.src(['**/*.js', '!node_modules/**/*.js', '!bin/**/*.js', '!src/client/public/**/*.js'])
     .pipe(jshint({
           esnext: true
       }))

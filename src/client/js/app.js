@@ -5,7 +5,7 @@ var playerNameInput = document.getElementById('playerNameInput');
 var socket;
 var reason;
 var KEY_ENTER = 13;
-var borderDraw = false;
+var borderDraw = true;
 var animLoopHandle;
 var spin = -Math.PI;
 var enemySpin = -Math.PI;
@@ -98,9 +98,10 @@ var kicked = false;
 
 // defaults
 // TODO break out into GameControls
-var continuity = false;
+var continuity = true;
+var showChat = true;
 var startPingTime = 0;
-var toggleMassState = 0;
+var toggleMassState = 1;
 var backgroundColor = '#f2fbff';
 
 var foodConfig = {
@@ -167,8 +168,31 @@ var graph = c.getContext('2d');
 
 function ChatClient(config) {
     this.commands = {};
-    var input = document.getElementById('chatInput');
-    input.addEventListener('keypress', this.sendChat.bind(this));
+    var input     = jQuery('#chatInput'),
+        chat      = jQuery('#chatbox'),
+        input2;
+
+    jQuery('body').on('keypress', function(e) {
+      console.log("key");
+      console.log(e.keyCode);
+      if (e.keyCode === 96) {
+        if (showChat === true) {
+          showChat = false;
+          chat.hide();
+        } else {
+          showChat = true;
+          input.focus().val("");
+          chat.show();
+        }
+        e.preventDefault();
+      } else if (showChat === false) {
+        if (e.keyCode === 87 || e.keyCode === 119) {
+          console.log("asdf");
+        }
+      }
+    });
+    input2 = document.getElementById('chatInput');
+    input2.addEventListener('keypress', this.sendChat.bind(this));
 }
 
 /** template into chat box a new message from a player */
@@ -764,14 +788,14 @@ function gameLoop() {
             }
 
             for (var i = 0; i < enemies.length; i++) {
-                if (enemies[i].mass <= player.mass) 
+                if (enemies[i].mass <= player.mass)
                     drawEnemy(enemies[i]);
             }
 
             drawPlayer();
 
             for (var j = 0; j < enemies.length; j++) {
-                if (enemies[j].mass > player.mass) 
+                if (enemies[j].mass > player.mass)
                     drawEnemy(enemies[j]);
             }
 
