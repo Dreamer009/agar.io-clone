@@ -52,6 +52,7 @@ function movePlayer(player) {
   for (var i = 0; i < player.nodes.length; i++) {
     moveNode(player, player.nodes[i]);
   }
+  util.updatePlayerXandY(player);
 }
 
 function moveNode(player, node) {
@@ -133,6 +134,8 @@ io.on('connection', function (socket) {
           radius: radius,
           mass:   configuration.defaultPlayerMass,
         }],
+        x:             position.x,
+        y:             position.y,
         hue:           Math.round(Math.random() * 360),
         lastHeartbeat: new Date().getTime(),
         target:        {
@@ -167,9 +170,10 @@ io.on('connection', function (socket) {
       }];
       player.target.x = player.x;
       player.target.y = player.y;
-      currentPlayer = player;
+      util.updatePlayer(player);
       console.log("player");
       console.log(player);
+      currentPlayer = player;
       currentPlayer.lastHeartbeat = new Date().getTime();
       users.push(currentPlayer);
 
@@ -308,8 +312,7 @@ function tickPlayer(currentPlayer) {
       if (select === true) {
         var node = currentPlayer.nodes[nodeCircles[i][0]];
 
-        node.mass   += configuration.foodMass;
-        node.radius  = util.massToRadius(node.mass);
+        util.addMassToNodeAndUpdatePlayer(currentPlayer, node, configuration.foodMass);
         return true;
       }
     }
@@ -392,8 +395,7 @@ function tickPlayer(currentPlayer) {
           killedName: smallUser.name
         });
 
-        largeNode.mass  += smallNode.mass;
-        largeNode.radius = util.massToRadius(largeNode.mass);
+        util.addMassToNodeAndUpdatePlayer(largeUser, largeNode, smallNode.mass);
         sockets[smallUser.id].emit('RIP');
       }
     }
@@ -443,10 +445,10 @@ function gameloop() {
 function sendUpdates() {
   users.forEach( function(u) {
     var visibleFood = food.map(function(f) {
-                        if (f.x > u.nodes[0].x - u.screenWidth / 2 - 20 &&
-                          f.x < u.nodes[0].x + u.screenWidth / 2 + 20 &&
-                          f.y > u.nodes[0].y - u.screenHeight / 2 - 20 &&
-                          f.y < u.nodes[0].y + u.screenHeight / 2 + 20) {
+                        if (f.x > u.x - u.screenWidth / 2 - 20 &&
+                          f.x < u.x + u.screenWidth / 2 + 20 &&
+                          f.y > u.y - u.screenHeight / 2 - 20 &&
+                          f.y < u.y + u.screenHeight / 2 + 20) {
                           return f;
                         }
                       }).filter(function(f) { return f; });
@@ -458,29 +460,29 @@ function sendUpdates() {
                              var fnode = f.nodes[i];
                              for (var j = 0; j < u.nodes.length; j++) {
                                var unode = u.nodes[j];
-                               if (fnode.x > unode.x - u.screenWidth / 2 - 20 &&
+                               if (f.id !== u.id &&
+                                 fnode.x > unode.x - u.screenWidth / 2 - 20 &&
                                  fnode.x < unode.x + u.screenWidth / 2 + 20 &&
                                  fnode.y > unode.y - u.screenHeight / 2 - 20 &&
-                                 fnode.y < unode.y + u.screenHeight / 2 + 20 &&
-                                 f.id !== u.id) {
+                                 fnode.y < unode.y + u.screenHeight / 2 + 20) {
                                  if (fclone === undefined) {
                                    fclone = {
                                      id: f.id,
                                      nodes: [{
-                                       x: fnode.x,
-                                       y: fnode.y,
+                                       x:      fnode.x,
+                                       y:      fnode.y,
                                        radius: Math.round(fnode.radius),
-                                       mass: Math.round(fnode.mass),
+                                       mass:   Math.round(fnode.mass),
                                      }],
-                                     hue: f.hue,
+                                     hue:  f.hue,
                                      name: f.name
                                    };
                                  } else {
                                    fclone.nodes.push({
-                                       x: fnode.x,
-                                       y: fnode.y,
+                                       x:      Math.round(fnode.x),
+                                       y:      Math.round(fnode.y),
                                        radius: Math.round(fnode.radius),
-                                       mass: Math.round(fnode.mass),
+                                       mass:   Math.round(fnode.mass),
                                    });
                                  }
                                }
@@ -488,8 +490,29 @@ function sendUpdates() {
                            }
                            return fclone;
                          }).filter(function(f) { return f; });
+    var uClone = {
+      id:    u.id,
+      nodes: [],
+      x:     Math.round(u.x),
+      y:     Math.round(u.y),
+      mass:  Math.round(u.mass),
+      hue:   u.hue,
+      name:  u.name
+    };
 
-    sockets[u.id].emit('serverTellPlayerMove', u.nodes, visibleEnemies, visibleFood);
+    for (var i = 0; i < u.nodes.length; i++) {
+      var unode = u.nodes[i];
+
+      uClone.nodes.push({
+        x:      Math.round(unode.x),
+        y:      Math.round(unode.y),
+        radius: Math.round(unode.radius),
+        mass:   Math.round(unode.mass),
+      });
+    }
+
+    sockets[u.id].emit('serverTellPlayerMove', uClone, visibleEnemies, visibleFood);
+
     if (leaderboardChanged) {
       sockets[u.id].emit('leaderboard', {
         players:     users.length,

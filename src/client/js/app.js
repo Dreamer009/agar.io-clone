@@ -79,46 +79,46 @@ window.onload = function() {
 };
 
 // Canvas
-var screenWidth = window.innerWidth;
+var screenWidth  = window.innerWidth;
 var screenHeight = window.innerHeight;
-var gameWidth = 0;
-var gameHeight = 0;
-var xoffset = -gameWidth;
-var yoffset = -gameHeight;
+var gameWidth    = 0;
+var gameHeight   = 0;
+var xoffset      = -gameWidth;
+var yoffset      = -gameHeight;
 
-var gameStart = false;
+var gameStart    = false;
 var disconnected = false;
-var died = false;
-var kicked = false;
+var died         = false;
+var kicked       = false;
 
 // defaults
 // TODO break out into GameControls
-var continuity = true;
-var showChat = true;
-var startPingTime = 0;
+var continuity      = true;
+var showChat        = true;
+var startPingTime   = 0;
 var toggleMassState = 1;
 var backgroundColor = '#f2fbff';
 
 var foodConfig = {
-    border: 0,
+    border:      0,
     borderColor: '#f39c12',
-    fillColor: '#f1c40f'
+    fillColor:   '#f1c40f'
 };
 
 var playerConfig = {
-    border: 6,
-    textColor: '#FFFFFF',
-    textBorder: '#000000',
+    border:         6,
+    textColor:      '#FFFFFF',
+    textBorder:     '#000000',
     textBorderSize: 3,
-    defaultSize: 30
+    defaultSize:    30
 };
 
 var enemyConfig = {
-    border: 5,
-    textColor: '#FFFFFF',
-    textBorder: '#000000',
+    border:         5,
+    textColor:      '#FFFFFF',
+    textBorder:     '#000000',
     textBorderSize: 3,
-    defaultSize: 30
+    defaultSize:    30
 };
 
 var currentPlayer = {
@@ -127,11 +127,12 @@ var currentPlayer = {
       x: screenWidth / 2,
       y: screenHeight / 2,
     }],
-    x: screenWidth / 2,
-    y: screenHeight / 2,
-    screenWidth: screenWidth,
+    x:            screenWidth / 2,
+    y:            screenHeight / 2,
+    mass:         10,
+    screenWidth:  screenWidth,
     screenHeight: screenHeight,
-    target: {
+    target:       {
       x: screenWidth / 2,
       y: screenHeight / 2
     }
@@ -142,8 +143,8 @@ var foods = [];
 var enemies = [];
 var leaderboard = [];
 var target = {
-  x: currentPlayer.nodes[0].x,
-  y: currentPlayer.nodes[0].y
+  x: currentPlayer.x,
+  y: currentPlayer.y
 };
 
 var canvas = document.getElementById('cvs');
@@ -212,7 +213,6 @@ ChatClient.prototype.addChatLine = function (name, message) {
 
   this.appendMessage(newline);
 };
-
 
 /** template into chat box a new message from the application */
 ChatClient.prototype.addSystemLine = function (message) {
@@ -463,23 +463,37 @@ function setupSocket(socket) {
   });
 
   // Handle movement
-  socket.on('serverTellPlayerMove', function (playerNodes, userData, foodsList) {
-    var nodes = currentPlayer.nodes,
-        i = 0;
+  socket.on('serverTellPlayerMove', function (updatedPlayer, updatedEnemies, foodsList) {
+    var nodes           = currentPlayer.nodes,
+        current_xoffset = currentPlayer.x - updatedPlayer.x,
+        current_yoffset = currentPlayer.y - updatedPlayer.y,
+        i               = 0;
 
     for (i = 0; i < nodes.length; i++) {
-      var node    = nodes[i],
-          xoffset = node.x - playerNodes[i].x,
-          yoffset = node.y - playerNodes[i].y;
+      var node    = nodes[i];
 
-      node.x         = playerNodes[i].x;
-      node.y         = playerNodes[i].y;
-      node.mass      = playerNodes[i].mass;
-      node.radius    = playerNodes[i].radius;
-      node.xoffset = isNaN(xoffset) ? 0 : xoffset;
-      node.yoffset = isNaN(yoffset) ? 0 : yoffset;
+      node.x         = updatedPlayer.nodes[i].x;
+      node.y         = updatedPlayer.nodes[i].y;
+      node.mass      = updatedPlayer.nodes[i].mass;
+      node.radius    = updatedPlayer.nodes[i].radius;
     }
-    enemies = userData;
+    for (i = nodes.length; i < updatedPlayer.nodes.length; i++) {
+      currentPlayer.nodes.push({
+        x:      updatedPlayer.nodes[i].x,
+        y:      updatedPlayer.nodes[i].y,
+        mass:   updatedPlayer.nodes[i].mass,
+        radius: updatedPlayer.nodes[i].radius
+      });
+    }
+    currentPlayer.x    = updatedPlayer.x;
+    currentPlayer.y    = updatedPlayer.y;
+    currentPlayer.mass = updatedPlayer.mass;
+    xoffset            = isNaN(current_xoffset) ? 0 : current_xoffset;
+    yoffset            = isNaN(current_yoffset) ? 0 : current_yoffset;
+
+    // console.log("currentPlayer");
+    // console.log(currentPlayer);
+    enemies = updatedEnemies;
     foods   = foodsList;
   });
 
@@ -527,85 +541,61 @@ function drawCircle(centerX, centerY, radius, sides) {
 }
 
 function drawFood(food) {
-  if (currentPlayer.nodes === undefined || currentPlayer.nodes.length === 0) { return; }
-
   graph.strokeStyle = food.color.border || foodConfig.borderColor;
   graph.fillStyle   = food.color.fill || foodConfig.fillColor;
   graph.lineWidth   = foodConfig.border;
-  drawCircle(food.x - currentPlayer.nodes[0].x + screenWidth / 2, food.y - currentPlayer.nodes[0].y + screenHeight / 2, food.radius, 9);
-}
-
-function setPlayerMass(player) {
-  var mass = 0,
-      tempMass = 0;
-  for (var i = 0; i < player.nodes.length; i++) {
-    tempMass = player.nodes[i].mass;
-    if (typeof(tempMass) === "number") {
-      mass += tempMass;
-    }
-  }
-  player.mass = mass;
+  drawCircle(food.x - currentPlayer.x + screenWidth / 2, food.y - currentPlayer.y + screenHeight / 2, food.radius, 9);
 }
 
 function drawPlayer() {
-  var xValues,
-      yValues,
-      node,
+  var node,
       circle = {
         x: screenWidth / 2,
         y: screenHeight / 2
       };
 
-  setPlayerMass(currentPlayer);
-
   for (var i = 0; i < currentPlayer.nodes.length; i++) {
     node = currentPlayer.nodes[i];
-    xValues = [
-      -node.x + screenWidth / 2,
-      gameWidth - node.x + screenWidth / 2
-    ];
-    yValues = [
-      -node.y + screenHeight / 2,
-      gameHeight - node.y + screenHeight / 2
-    ];
-    drawNode(currentPlayer, node, playerConfig, xValues, yValues, circle);
+    drawNode(currentPlayer, node, playerConfig, circle);
   }
 }
 
 function drawEnemy(enemy) {
-  var xValues,
-      yValues,
-      node,
+  var node,
       circle;
-
-  setPlayerMass(enemy);
 
   for (var i = 0; i < enemy.nodes.length; i++) {
     node = enemy.nodes[i];
-    xValues = [
-      -node.x - currentPlayer.nodes[0].x + screenWidth/2 + (node.radius/3),
-      gameWidth - node.x + gameWidth - currentPlayer.nodes[0].x + screenWidth/2 - (node.radius/3)
-    ];
-    yValues = [
-      -node.y - currentPlayer.nodes[0].y + screenHeight/2 + (node.radius/3),
-      gameHeight - node.y + gameHeight - currentPlayer.nodes[0].y + screenHeight/2 - (node.radius/3)
-    ];
     circle = {
-      x: node.x - currentPlayer.nodes[0].x + screenWidth / 2,
-      y: node.y - currentPlayer.nodes[0].y + screenHeight / 2
+      x: node.x - currentPlayer.x + screenWidth / 2,
+      y: node.y - currentPlayer.y + screenHeight / 2
     };
-    drawNode(enemy, node, enemyConfig, xValues, yValues, circle);
+    // console.log("node");
+    // console.log(node);
+    // console.log("xValues");
+    // console.log(xValues);
+    // console.log("yValues");
+    // console.log(yValues);
+    drawNode(enemy, node, enemyConfig, circle);
   }
 }
 
-function drawNode(player, node, config, xValues, yValues, circle) {
+function drawNode(player, node, config, circle) {
   var x        = 0,
       y        = 0,
       points   = 30 + ~~(node.mass/5),
       increase = Math.PI * 2 / points,
       xstore   = [],
       ystore   = [],
-      fontSize;
+      fontSize,
+      xValues = [
+        -node.x - currentPlayer.x + screenWidth / 2 + (node.radius / 3),
+        gameWidth - node.x + gameWidth - currentPlayer.x + screenWidth / 2 - (node.radius / 3)
+      ],
+      yValues = [
+        -node.y - currentPlayer.y + screenHeight / 2 + (node.radius / 3),
+        gameHeight - node.y + gameHeight - currentPlayer.y + screenHeight / 2 - (node.radius / 3)
+      ];
 
   graph.strokeStyle = 'hsl(' + player.hue + ', 80%, 40%)';
   graph.fillStyle = 'hsl(' + player.hue + ', 70%, 50%)';
@@ -658,8 +648,8 @@ function drawNode(player, node, config, xValues, yValues, circle) {
     graph.strokeText(player.name, screenWidth / 2, screenHeight / 2);
     graph.fillText(player.name, screenWidth / 2, screenHeight / 2);
   } else {
-    graph.strokeText(player.name + ' (' + player.mass + ')', circle.x, circle.y);
-    graph.fillText(player.name + ' (' + player.mass + ')', circle.x, circle.y);
+    graph.strokeText(player.name + ' (' + node.mass + ')', circle.x, circle.y);
+    graph.fillText(player.name + ' (' + node.mass + ')', circle.x, circle.y);
   }
 }
 
@@ -668,19 +658,17 @@ function valueInRange(min, max, value) {
 }
 
 function drawgrid() {
-  if (currentPlayer.nodes === undefined || currentPlayer.nodes.length === 0) { return; }
-
   graph.lineWidth   = 1;
   graph.strokeStyle = '#000';
   graph.globalAlpha = 0.15;
   graph.beginPath();
 
-  for (var x = xoffset - currentPlayer.nodes[0].x; x < screenWidth; x += screenHeight / 18) {
+  for (var x = xoffset - currentPlayer.x; x < screenWidth; x += screenHeight / 18) {
     graph.moveTo(x, 0);
     graph.lineTo(x, screenHeight);
   }
 
-  for (var y = yoffset - currentPlayer.nodes[0].y ; y < screenHeight; y += screenHeight / 18) {
+  for (var y = yoffset - currentPlayer.y ; y < screenHeight; y += screenHeight / 18) {
     graph.moveTo(0, y);
     graph.lineTo(screenWidth, y);
   }
@@ -692,40 +680,38 @@ function drawgrid() {
 function drawborder() {
   graph.strokeStyle = playerConfig.borderColor;
 
-  if (currentPlayer.nodes === undefined || currentPlayer.nodes.length === 0) { return; }
-
   // Left-vertical
-  if (currentPlayer.nodes[0].x <= screenWidth/2) {
+  if (currentPlayer.x <= screenWidth / 2) {
     graph.beginPath();
-    graph.moveTo(screenWidth/2 - currentPlayer.nodes[0].x, 0 ? currentPlayer.nodes[0].y > screenHeight/2 : screenHeight/2 - currentPlayer.nodes[0].y);
-    graph.lineTo(screenWidth/2 - currentPlayer.nodes[0].x, gameHeight + screenHeight/2 - currentPlayer.nodes[0].y);
+    graph.moveTo(screenWidth / 2 - currentPlayer.x, 0 ? currentPlayer.y > screenHeight / 2 : screenHeight / 2 - currentPlayer.y);
+    graph.lineTo(screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Top-horizontal
-  if (currentPlayer.nodes[0].y <= screenHeight/2) {
+  if (currentPlayer.y <= screenHeight / 2) {
     graph.beginPath();
-    graph.moveTo(0 ? currentPlayer.nodes[0].x > screenWidth/2 : screenWidth/2 - currentPlayer.nodes[0].x, screenHeight/2 - currentPlayer.nodes[0].y);
-    graph.lineTo(gameWidth + screenWidth/2 - currentPlayer.nodes[0].x, screenHeight/2 - currentPlayer.nodes[0].y);
+    graph.moveTo(0 ? currentPlayer.x > screenWidth / 2 : screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
+    graph.lineTo(gameWidth + screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Right-vertical
-  if (gameWidth - currentPlayer.nodes[0].x <= screenWidth/2) {
+  if (gameWidth - currentPlayer.x <= screenWidth / 2) {
     graph.beginPath();
-    graph.moveTo(gameWidth + screenWidth/2 - currentPlayer.nodes[0].x, screenHeight/2 - currentPlayer.nodes[0].y);
-    graph.lineTo(gameWidth + screenWidth/2 - currentPlayer.nodes[0].x, gameHeight + screenHeight/2 - currentPlayer.nodes[0].y);
+    graph.moveTo(gameWidth + screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
+    graph.lineTo(gameWidth + screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Bottom-horizontal
-  if (gameHeight - currentPlayer.nodes[0].y <= screenHeight/2) {
+  if (gameHeight - currentPlayer.y <= screenHeight / 2) {
     graph.beginPath();
-    graph.moveTo(gameWidth + screenWidth/2 - currentPlayer.nodes[0].x, gameHeight + screenHeight/2 - currentPlayer.nodes[0].y);
-    graph.lineTo(screenWidth/2 - currentPlayer.nodes[0].x, gameHeight + screenHeight/2 - currentPlayer.nodes[0].y);
+    graph.moveTo(gameWidth + screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
+    graph.lineTo(screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
@@ -794,10 +780,10 @@ function gameLoop() {
 
       drawPlayer();
 
-      for (var j = 0; j < enemies.length; j++) {
-        if (enemies[j].mass > currentPlayer.mass)
-        drawEnemy(enemies[j]);
-      }
+      // for (var j = 0; j < enemies.length; j++) {
+      //   if (enemies[j].mass > currentPlayer.mass)
+      //   drawEnemy(enemies[j]);
+      // }
 
       socket.emit('0', target); // playerSendTarget Heartbeat
     } else {

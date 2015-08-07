@@ -91,3 +91,43 @@ exports.randomColor = function() {
     border: '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)
   };
 };
+
+exports.addMassToNodeAndUpdatePlayer = function(player, node, nodeMassIncrease) {
+  node.mass  += nodeMassIncrease;
+  node.radius = exports.massToRadius(node.mass);
+  exports.updatePlayer(player);
+};
+
+exports.updatePlayer = function(player) {
+  exports.updatePlayerMass(player);
+  exports.updatePlayerXandY(player);
+};
+
+exports.updatePlayerMass = function(player) {
+  var mass = 0,
+      tempMass = 0;
+
+  for (var i = 0; i < player.nodes.length; i++) {
+    tempMass = player.nodes[i].mass;
+    if (typeof(tempMass) === "number") {
+      mass += tempMass;
+    }
+  }
+  player.mass = mass;
+};
+
+exports.updatePlayerXandY = function(player) {
+  var tempx = 0,
+      tempy = 0;
+
+  for (var i = 0; i < player.nodes.length; i++) {
+    if (typeof(player.nodes[i].x) === "number") {
+      tempx += player.nodes[i].x;
+    }
+    if (typeof(player.nodes[i].y) === "number") {
+      tempy += player.nodes[i].y;
+    }
+  }
+  player.x = tempx / player.nodes.length;
+  player.y = tempy / player.nodes.length;
+};
