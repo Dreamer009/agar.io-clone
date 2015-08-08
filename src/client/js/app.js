@@ -192,8 +192,8 @@ function ChatClient(config) {
       }
       e.preventDefault();
     } else if (showChat === false) {
-      if (e.keyCode === 87 || e.keyCode === 119) {
-        console.log("asdf");
+      if (e.keyCode === 32) {
+        socket.emit("playerSplit");
       }
     }
   });
@@ -548,39 +548,24 @@ function drawFood(food) {
 }
 
 function drawPlayer() {
-  var node,
-      circle = {
-        x: screenWidth / 2,
-        y: screenHeight / 2
-      };
+  var node;
 
   for (var i = 0; i < currentPlayer.nodes.length; i++) {
     node = currentPlayer.nodes[i];
-    drawNode(currentPlayer, node, playerConfig, circle);
+    drawNode(currentPlayer, node, playerConfig);
   }
 }
 
 function drawEnemy(enemy) {
-  var node,
-      circle;
+  var node;
 
   for (var i = 0; i < enemy.nodes.length; i++) {
     node = enemy.nodes[i];
-    circle = {
-      x: node.x - currentPlayer.x + screenWidth / 2,
-      y: node.y - currentPlayer.y + screenHeight / 2
-    };
-    // console.log("node");
-    // console.log(node);
-    // console.log("xValues");
-    // console.log(xValues);
-    // console.log("yValues");
-    // console.log(yValues);
-    drawNode(enemy, node, enemyConfig, circle);
+    drawNode(enemy, node, enemyConfig);
   }
 }
 
-function drawNode(player, node, config, circle) {
+function drawNode(player, node, config) {
   var x        = 0,
       y        = 0,
       points   = 30 + ~~(node.mass/5),
@@ -595,7 +580,16 @@ function drawNode(player, node, config, circle) {
       yValues = [
         -node.y - currentPlayer.y + screenHeight / 2 + (node.radius / 3),
         gameHeight - node.y + gameHeight - currentPlayer.y + screenHeight / 2 - (node.radius / 3)
-      ];
+      ],
+      circle = {
+        x: node.x - currentPlayer.x + screenWidth / 2,
+        y: node.y - currentPlayer.y + screenHeight / 2
+      };
+
+  // console.log("xValues");
+  // console.log(xValues);
+  // console.log("yValues");
+  // console.log(yValues);
 
   graph.strokeStyle = 'hsl(' + player.hue + ', 80%, 40%)';
   graph.fillStyle = 'hsl(' + player.hue + ', 70%, 50%)';

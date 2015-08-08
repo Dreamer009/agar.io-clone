@@ -56,11 +56,13 @@ function movePlayer(player) {
 }
 
 function moveNode(player, node) {
-  var dist     = Math.sqrt(Math.pow(player.target.y, 2) + Math.pow(player.target.x, 2)),
-      deg      = Math.atan2(player.target.y, player.target.x),
+  var dx       = player.target.x - (node.x - player.x),
+      dy       = player.target.y - (node.y - player.y),
+      dist     = Math.sqrt(Math.pow(dy, 2) + Math.pow(dx, 2)),
+      deg      = Math.atan2(dy, dx),
       slowDown = util.log(node.mass, configuration.slowBase) - initMassLog + 1,
-      deltaY   = player.speed * Math.sin(deg)/ slowDown,
-      deltaX   = player.speed * Math.cos(deg)/ slowDown;
+      deltaY   = player.speed * Math.sin(deg) / slowDown,
+      deltaX   = player.speed * Math.cos(deg) / slowDown;
 
   if (dist < (50 + node.radius)) {
     deltaY *= dist / (50 + node.radius);
@@ -281,6 +283,44 @@ io.on('connection', function (socket) {
       currentPlayer.target = target;
     }
   });
+  socket.on('playerSplit', function (player) {
+    var nodes       = currentPlayer.nodes,
+        returnNodes = [],
+        node,
+        splitMass,
+        i;
+
+    if (nodes.length < configuration.maxNodes) {
+      for (i = 0; i < nodes.length; i++) {
+        node = nodes[i];
+
+        if (node.mass > configuration.minSplitMass && returnNodes.length < configuration.maxNodes - 1) {
+          splitMass = Math.round(node.mass / 2);
+
+          returnNodes.push({
+            x:      node.x,
+            y:      node.y,
+            mass:   splitMass,
+            radius: util.massToRadius(splitMass),
+          });
+
+          splitMass         = node.mass - splitMass;
+
+          returnNodes.push({
+            x:      Math.round(node.x) + 25,
+            y:      Math.round(node.y) + 25,
+            mass:   splitMass,
+            radius: util.massToRadius(splitMass),
+          });
+        }
+      }
+      currentPlayer.nodes = returnNodes;
+    }
+
+    util.updatePlayer(currentPlayer);
+    console.log("currentPlayer");
+    console.log(currentPlayer.nodes.length);
+  });
 });
 
 function tickPlayer(currentPlayer) {
@@ -326,7 +366,7 @@ function tickPlayer(currentPlayer) {
     food.splice(f, 1);
   });
 
-  currentPlayer.speed   = 6.25;
+  currentPlayer.speed   = configuration.playerSpeed;
   currentPlayer.mass   += foodEaten.length * configuration.foodMass;
 
   for (i = 0; i < nodeCircles.length; i++) {
@@ -490,6 +530,9 @@ function sendUpdates() {
                            }
                            return fclone;
                          }).filter(function(f) { return f; });
+
+    util.updatePlayerXandY(u);
+
     var uClone = {
       id:    u.id,
       nodes: [],
