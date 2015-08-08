@@ -16,5 +16,6 @@
     "newPlayerInitialPosition": "farthest",
     "massLossRate":             10,
     "maxNodes":                 16,
-    "minSplitMass":             2
+    "minSplitMass":             2,
+    "releaseTime":              20000
 }

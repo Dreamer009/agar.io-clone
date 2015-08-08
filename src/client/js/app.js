@@ -65,7 +65,7 @@ window.onload = function() {
   };
 
   playerNameInput.addEventListener('keypress', function (e) {
-    var key = e.which || e.keyCode;
+    var key = e.which || e.charCode;
 
     if (key === KEY_ENTER) {
       if (validNick()) {
@@ -180,8 +180,8 @@ function ChatClient(config) {
 
   jQuery('body').on('keypress', function(e) {
     // console.log("key");
-    // console.log(e.keyCode);
-    if (e.keyCode === 96) {
+    // console.log(e.charCode);
+    if (e.charCode === 96) {
       if (showChat === true) {
         showChat = false;
         chat.hide();
@@ -192,7 +192,7 @@ function ChatClient(config) {
       }
       e.preventDefault();
     } else if (showChat === false) {
-      if (e.keyCode === 32) {
+      if (e.charCode === 32) {
         socket.emit("playerSplit");
       }
     }
@@ -244,7 +244,7 @@ ChatClient.prototype.sendChat = function (key) {
   var commands = this.commands,
       input = document.getElementById('chatInput');
 
-  key = key.which || key.keyCode;
+  key = key.which || key.charCode;
 
   if (key === KEY_ENTER) {
     var text = input.value.replace(/(<([^>]+)>)/ig,'');
@@ -467,29 +467,24 @@ function setupSocket(socket) {
     var nodes           = currentPlayer.nodes,
         current_xoffset = currentPlayer.x - updatedPlayer.x,
         current_yoffset = currentPlayer.y - updatedPlayer.y,
+        returnNodes     = [],
         i               = 0;
 
-    for (i = 0; i < nodes.length; i++) {
-      var node    = nodes[i];
-
-      node.x         = updatedPlayer.nodes[i].x;
-      node.y         = updatedPlayer.nodes[i].y;
-      node.mass      = updatedPlayer.nodes[i].mass;
-      node.radius    = updatedPlayer.nodes[i].radius;
-    }
-    for (i = nodes.length; i < updatedPlayer.nodes.length; i++) {
-      currentPlayer.nodes.push({
+    for (i = 0; i < updatedPlayer.nodes.length; i++) {
+      returnNodes.push({
         x:      updatedPlayer.nodes[i].x,
         y:      updatedPlayer.nodes[i].y,
         mass:   updatedPlayer.nodes[i].mass,
         radius: updatedPlayer.nodes[i].radius
       });
     }
-    currentPlayer.x    = updatedPlayer.x;
-    currentPlayer.y    = updatedPlayer.y;
-    currentPlayer.mass = updatedPlayer.mass;
-    xoffset            = isNaN(current_xoffset) ? 0 : current_xoffset;
-    yoffset            = isNaN(current_yoffset) ? 0 : current_yoffset;
+
+    currentPlayer.nodes = returnNodes;
+    currentPlayer.x     = updatedPlayer.x;
+    currentPlayer.y     = updatedPlayer.y;
+    currentPlayer.mass  = updatedPlayer.mass;
+    xoffset             = isNaN(current_xoffset) ? 0 : current_xoffset;
+    yoffset             = isNaN(current_yoffset) ? 0 : current_yoffset;
 
     // console.log("currentPlayer");
     // console.log(currentPlayer);

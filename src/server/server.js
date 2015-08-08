@@ -9,7 +9,7 @@ var express            = require('express'),
     configuration      = require('../../config.json'),  // Import game settings
     util               = require('./lib/util'),  // Import utilities
     quadtree           = require('../../quadtree'),  // Import quadtree
-    args               = {x : 0, y : 0, h : configuration.gameHeight, w : configuration.gameWidth, maxChildren : 1, maxDepth : 5},
+    args               = {x: 0, y: 0, h: configuration.gameHeight, w: configuration.gameWidth, maxChildren: 1, maxDepth: 5},
     tree               = quadtree.QUAD.init(args),
     users              = [],
     food               = [],
@@ -49,20 +49,39 @@ function removeFood(toRem) {
 
 // implement player movement in the direction of the target
 function movePlayer(player) {
-  for (var i = 0; i < player.nodes.length; i++) {
-    moveNode(player, player.nodes[i]);
+  var playerCircles = [],
+      node,
+      i;
+
+  for (i = 0; i < player.nodes.length; i++) {
+    node = player.nodes[i];
+
+    playerCircles.push(
+      new C(
+        new V(node.x, node.y),
+        node.radius
+      )
+    );
+  }
+  for (i = 0; i < player.nodes.length; i++) {
+    moveNode(player, player.nodes[i], playerCircles, i);
   }
   util.updatePlayerXandY(player);
 }
 
-function moveNode(player, node) {
+function moveNode(player, node, playerCircles, index) {
   var dx       = player.target.x - (node.x - player.x),
       dy       = player.target.y - (node.y - player.y),
       dist     = Math.sqrt(Math.pow(dy, 2) + Math.pow(dx, 2)),
       deg      = Math.atan2(dy, dx),
       slowDown = util.log(node.mass, configuration.slowBase) - initMassLog + 1,
       deltaY   = player.speed * Math.sin(deg) / slowDown,
-      deltaX   = player.speed * Math.cos(deg) / slowDown;
+      deltaX   = player.speed * Math.cos(deg) / slowDown,
+      newX     = node.x,
+      newY     = node.y,
+      collided = false,
+      newCircle,
+      i;
 
   if (dist < (50 + node.radius)) {
     deltaY *= dist / (50 + node.radius);
@@ -70,11 +89,58 @@ function moveNode(player, node) {
   }
 
   if (!isNaN(deltaY)) {
-    node.y += deltaY;
+    newY += deltaY;
   }
   if (!isNaN(deltaX)) {
-    node.x += deltaX;
+    newX += deltaX;
   }
+  newCircle = new C(
+    new V(newX, newY),
+    node.radius
+  );
+
+  for (i = 0; i < playerCircles.length; i++) {
+    var response = new SAT.Response(),
+        smallNode,
+        largeNode,
+        smallNodePastRelease,
+        largeNodePastRelease,
+        largeCircle,
+        overlap;
+
+    if (i !== index) {
+      collided = SAT.testCircleCircle(playerCircles[i], newCircle, response);
+      if (collided === true) {
+        if (node.mass > player.nodes[i].mass) {
+          smallNode   = player.nodes[i];
+          largeNode   = node;
+          largeCircle = newCircle;
+        } else {
+          smallNode   = node;
+          largeNode   = player.nodes[i];
+          largeCircle = playerCircles[i];
+        }
+        smallNodePastRelease = smallNode.releaseTime < new Date().getTime();
+        largeNodePastRelease = largeNode.releaseTime < new Date().getTime();
+        overlap              = SAT.pointInCircle(new V(smallNode.x, smallNode.y), largeCircle);
+
+        if ((largeNode.releaseTime === undefined && (smallNode.releaseTime === undefined || smallNodePastRelease)) ||
+            (smallNode.releaseTime === undefined && largeNodePastRelease) ||
+            (smallNodePastRelease && largeNodePastRelease)) {
+          if (overlap === true) {
+            mergeNodes(player, i, index);
+          } else {
+            break;
+          }
+        }
+        return;
+      }
+    }
+  }
+
+  node.y               = newY;
+  node.x               = newX;
+  playerCircles[index] = newCircle;
 
   var borderCalc = node.radius / 3;
 
@@ -90,6 +156,38 @@ function moveNode(player, node) {
   if (node.y < borderCalc) {
     node.y = borderCalc;
   }
+}
+
+function mergeNodes(player, aIndex, bIndex) {
+  var returnNodes = [],
+      mergeMass,
+      node,
+      i;
+
+  for (i = 0; i < player.nodes.length; i++) {
+    node = player.nodes[i];
+
+    if (i !== aIndex && i !== bIndex) {
+      returnNodes.push({
+        x:           node.x,
+        y:           node.y,
+        mass:        node.mass,
+        releaseTime: node.releaseTime,
+        radius:      node.radius
+      });
+    }
+  }
+
+  mergeMass = player.nodes[aIndex].mass + player.nodes[bIndex].mass;
+  returnNodes.push({
+    x:      Math.round((player.nodes[aIndex].x + player.nodes[aIndex].x) / 2),
+    y:      Math.round((player.nodes[aIndex].y + player.nodes[aIndex].y) / 2),
+    mass:   mergeMass,
+    radius: util.massToRadius(mergeMass)
+  });
+
+  player.nodes = returnNodes;
+  util.updatePlayer(player);
 }
 
 function balanceMass() {
@@ -288,6 +386,8 @@ io.on('connection', function (socket) {
         returnNodes = [],
         node,
         splitMass,
+        radius,
+        releaseTime = new Date().getTime() + configuration.releaseTime,
         i;
 
     if (nodes.length < configuration.maxNodes) {
@@ -298,19 +398,22 @@ io.on('connection', function (socket) {
           splitMass = Math.round(node.mass / 2);
 
           returnNodes.push({
-            x:      node.x,
-            y:      node.y,
-            mass:   splitMass,
-            radius: util.massToRadius(splitMass),
+            x:           node.x,
+            y:           node.y,
+            mass:        splitMass,
+            radius:      util.massToRadius(splitMass),
+            releaseTime: releaseTime
           });
 
-          splitMass         = node.mass - splitMass;
+          splitMass = node.mass - splitMass;
+          radius    = util.massToRadius(splitMass);
 
           returnNodes.push({
-            x:      Math.round(node.x) + 25,
-            y:      Math.round(node.y) + 25,
-            mass:   splitMass,
-            radius: util.massToRadius(splitMass),
+            x:           Math.round(node.x) + radius * 2,
+            y:           Math.round(node.y) + radius * 2,
+            mass:        splitMass,
+            radius:      radius,
+            releaseTime: releaseTime
           });
         }
       }
@@ -318,8 +421,6 @@ io.on('connection', function (socket) {
     }
 
     util.updatePlayer(currentPlayer);
-    console.log("currentPlayer");
-    console.log(currentPlayer.nodes.length);
   });
 });
 
@@ -412,13 +513,19 @@ function tickPlayer(currentPlayer) {
         smallNodeIndex = a_large ? collision.bNodeIndex : collision.aNodeIndex,
         largeUser      = a_large ? collision.aUser      : collision.bUser,
         largeNode      = a_large ? collision.aNode      : collision.bNode,
-        largeNodeIndex = a_large ? collision.aNodeIndex : collision.bNodeIndex;
+        largeNodeIndex = a_large ? collision.aNodeIndex : collision.bNodeIndex,
+        overlap        = SAT.pointInCircle(new V(smallNode.x, smallNode.y),
+                          new C(
+                            new V(largeNode.x, largeNode.y),
+                            largeNode.radius
+                          )
+                        );
 
     // console.log("collision");
     // console.log(collision);
 
-    if (largeNode.mass > smallNode.mass * 1.1 &&
-        largeNode.radius > Math.sqrt(Math.pow(largeNode.x - smallNode.x, 2) + Math.pow(largeNode.y - smallNode.y, 2))*1.75) {
+    if (largeNode.mass > smallNode.mass * 1.1 && overlap) {
+        // largeNode.radius > Math.sqrt(Math.pow(largeNode.x - smallNode.x, 2) + Math.pow(largeNode.y - smallNode.y, 2))*1.75) {
 
       // remove the smaller node
       smallUser.nodes.splice(smallNodeIndex, 1);
