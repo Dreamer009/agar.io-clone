@@ -81,7 +81,17 @@ function moveNode(player, node, playerCircles, index) {
       newY     = node.y,
       collided = false,
       newCircle,
-      i;
+      i,
+      response,
+      existingResponse,
+      playerNode,
+      smallNode,
+      largeNode,
+      smallNodePastRelease,
+      largeNodePastRelease,
+      largeCircle,
+      eatOverlap,
+      existingOverlap;
 
   if (dist < (50 + node.radius)) {
     deltaY *= dist / (50 + node.radius);
@@ -100,39 +110,55 @@ function moveNode(player, node, playerCircles, index) {
   );
 
   for (i = 0; i < playerCircles.length; i++) {
-    var response = new SAT.Response(),
-        smallNode,
-        largeNode,
-        smallNodePastRelease,
-        largeNodePastRelease,
-        largeCircle,
-        overlap;
+    response = new SAT.Response();
 
     if (i !== index) {
       collided = SAT.testCircleCircle(playerCircles[i], newCircle, response);
+
       if (collided === true) {
-        if (node.mass > player.nodes[i].mass) {
-          smallNode   = player.nodes[i];
+        playerNode = player.nodes[i];
+
+        if (playerNode === undefined) {
+          return;
+        }
+
+        if (node.mass > playerNode.mass) {
+          smallNode   = playerNode;
           largeNode   = node;
           largeCircle = newCircle;
         } else {
           smallNode   = node;
-          largeNode   = player.nodes[i];
+          largeNode   = playerNode;
           largeCircle = playerCircles[i];
         }
         smallNodePastRelease = smallNode.releaseTime < new Date().getTime();
         largeNodePastRelease = largeNode.releaseTime < new Date().getTime();
-        overlap              = SAT.pointInCircle(new V(smallNode.x, smallNode.y), largeCircle);
+        eatOverlap           = SAT.pointInCircle(new V(smallNode.x, smallNode.y), largeCircle);
+
+        // allow small overlap
+        if (response.overlap < 3) {
+          continue;
+        }
 
         if ((largeNode.releaseTime === undefined && (smallNode.releaseTime === undefined || smallNodePastRelease)) ||
             (smallNode.releaseTime === undefined && largeNodePastRelease) ||
             (smallNodePastRelease && largeNodePastRelease)) {
-          if (overlap === true) {
+          if (eatOverlap === true) {
             mergeNodes(player, i, index);
+            return;
           } else {
-            break;
+            continue;
           }
         }
+
+        // move the node if it creates less overlap
+        existingResponse = new SAT.Response();
+        existingOverlap  = SAT.testCircleCircle(playerCircles[i], playerCircles[index], existingResponse);
+        if (existingOverlap && response.overlap < existingResponse.overlap) {
+          continue;
+        }
+
+        // don't want to move because there was a collision
         return;
       }
     }
