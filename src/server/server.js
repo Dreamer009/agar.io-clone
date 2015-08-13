@@ -76,8 +76,10 @@ function moveNode(player, node, playerCircles, index) {
       dist     = Math.sqrt(Math.pow(dy, 2) + Math.pow(dx, 2)),
       deg      = Math.atan2(dy, dx),
       slowDown = util.log(node.mass, configuration.slowBase) - initMassLog + 1,
-      deltaY   = player.speed * Math.sin(deg) / slowDown,
-      deltaX   = player.speed * Math.cos(deg) / slowDown,
+      speedY   = player.speed,
+      speedX   = player.speed,
+      deltaY,
+      deltaX,
       newX     = node.x,
       newY     = node.y,
       collided = false,
@@ -95,9 +97,17 @@ function moveNode(player, node, playerCircles, index) {
       existingOverlap;
 
   if (player.speedBoostTill !== undefined && new Date().getTime() <= player.speedBoostTill) {
-    deltaY = player.speed * configuration.speedBoostMultiplier * Math.sin(deg) / slowDown;
-    deltaX = player.speed * configuration.speedBoostMultiplier * Math.cos(deg) / slowDown;
+    speedY = speedY * configuration.speedBoostMultiplier;
+    speedX = speedX * configuration.speedBoostMultiplier;
   }
+
+  if (node.splitBoostTill !== undefined && new Date().getTime() <= node.splitBoostTill) {
+    speedY = speedY * configuration.splitBoostMultiplier;
+    speedX = speedX * configuration.splitBoostMultiplier;
+  }
+
+  deltaY   = speedY * Math.sin(deg) / slowDown;
+  deltaX   = speedX * Math.cos(deg) / slowDown;
 
   if (dist < (50 + node.radius)) {
     deltaY *= dist / (50 + node.radius);
@@ -428,39 +438,49 @@ io.on('connection', function (socket) {
     }
   });
 
-  socket.on('playerSplit', function (player) {
+  socket.on('playerSplit', function () {
     var nodes       = currentPlayer.nodes,
         returnNodes = [],
         node,
+        deg,
+        deltaY,
+        deltaX,
         splitMass,
         radius,
-        releaseTime = new Date().getTime() + configuration.releaseTime,
+        releaseTime    = new Date().getTime() + configuration.releaseTime,
+        splitBoostTill = new Date().getTime() + configuration.splitBoostDurationTime,
         i;
+
 
     if (nodes.length < configuration.maxNodes) {
       for (i = 0; i < nodes.length; i++) {
-        node = nodes[i];
+        node   = nodes[i];
+        deg    = Math.atan2(currentPlayer.target.x - (node.x - currentPlayer.x), currentPlayer.target.y - (node.y - currentPlayer.y));
+        deltaY = Math.sin(deg);
+        deltaX = Math.cos(deg);
 
         if (node.mass > configuration.minSplitMass && returnNodes.length < configuration.maxNodes - 1) {
           splitMass = Math.round(node.mass / 2);
 
           returnNodes.push({
-            x:           node.x,
-            y:           node.y,
-            mass:        splitMass,
-            radius:      util.massToRadius(splitMass),
-            releaseTime: releaseTime
+            x:              node.x,
+            y:              node.y,
+            mass:           splitMass,
+            radius:         util.massToRadius(splitMass),
+            releaseTime:    releaseTime,
+            splitBoostTill: node.splitBoostTill
           });
 
           splitMass = node.mass - splitMass;
           radius    = util.massToRadius(splitMass);
 
           returnNodes.push({
-            x:           Math.round(node.x) + radius * 2,
-            y:           Math.round(node.y) + radius * 2,
-            mass:        splitMass,
-            radius:      radius,
-            releaseTime: releaseTime
+            x:              Math.round(node.x + deltaX),
+            y:              Math.round(node.y + deltaY),
+            mass:           splitMass,
+            radius:         radius,
+            releaseTime:    releaseTime,
+            splitBoostTill: splitBoostTill
           });
         }
       }
@@ -572,6 +592,19 @@ function tickPlayer(currentPlayer) {
     // console.log(collision);
 
     if (largeNode.mass > smallNode.mass * 1.1 && overlap) {
+    // if (overlap &&
+    //      (
+    //        (
+    //          largeNode.releaseTime !== undefined && new Date().getTime() < largeNode.releaseTime && largeNode.mass > smallNode.mass * 1.3
+    //        ) || (
+    //          (
+    //            largeNode.releaseTime === undefined || (
+    //              largeNode.releaseTime !== undefined && largeNode.releaseTime < new Date().getTime()
+    //            )
+    //          ) && largeNode.mass > smallNode.mass * 1.1
+    //        )
+    //      )
+    //    ) {
         // largeNode.radius > Math.sqrt(Math.pow(largeNode.x - smallNode.x, 2) + Math.pow(largeNode.y - smallNode.y, 2))*1.75) {
 
       // remove the smaller node
