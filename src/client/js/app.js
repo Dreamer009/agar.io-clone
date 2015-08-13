@@ -198,6 +198,8 @@ function ChatClient(config) {
     } else if (showChat === false) {
       if (e.charCode === 32) {
         socket.emit("playerSplit");
+      } else if (e.charCode === 83 || e.charCode === 115) {
+        socket.emit("speedBoost");
       }
     }
   });
@@ -455,6 +457,13 @@ function setupSocket(socket) {
       }
     }
     document.getElementById('status').innerHTML = status;
+  });
+
+  socket.on('speedBoostTimer', function (string, hide) {
+    document.getElementById('speed-boost').innerHTML = string;
+    if (hide === true) {
+      $('#speed-boost').hide();
+    }
   });
 
   socket.on('serverMSG', function (data) {

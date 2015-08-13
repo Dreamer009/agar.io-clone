@@ -94,6 +94,11 @@ function moveNode(player, node, playerCircles, index) {
       eatOverlap,
       existingOverlap;
 
+  if (player.speedBoostTill !== undefined && new Date().getTime() <= player.speedBoostTill) {
+    deltaY = player.speed * configuration.speedBoostMultiplier * Math.sin(deg) / slowDown;
+    deltaX = player.speed * configuration.speedBoostMultiplier * Math.cos(deg) / slowDown;
+  }
+
   if (dist < (50 + node.radius)) {
     deltaY *= dist / (50 + node.radius);
     deltaX *= dist / (50 + node.radius);
@@ -261,11 +266,12 @@ io.on('connection', function (socket) {
           radius: radius,
           mass:   configuration.defaultPlayerMass,
         }],
-        x:             position.x,
-        y:             position.y,
-        hue:           Math.round(Math.random() * 360),
-        lastHeartbeat: new Date().getTime(),
-        target:        {
+        x:              position.x,
+        y:              position.y,
+        hue:            Math.round(Math.random() * 360),
+        lastHeartbeat:  new Date().getTime(),
+        lastSpeedBoost: new Date().getTime(),
+        target: {
           x: 0,
           y: 0
         }
@@ -302,7 +308,8 @@ io.on('connection', function (socket) {
       console.log("player");
       console.log(player);
       currentPlayer = player;
-      currentPlayer.lastHeartbeat = new Date().getTime();
+      currentPlayer.lastHeartbeat  = new Date().getTime();
+      currentPlayer.lastSpeedBoost = new Date().getTime();
       users.push(currentPlayer);
 
       io.emit('playerJoin', { name: currentPlayer.name });
@@ -410,6 +417,17 @@ io.on('connection', function (socket) {
       currentPlayer.target = target;
     }
   });
+
+  socket.on('speedBoost', function() {
+    var now            = new Date().getTime(),
+        timeTillRefesh = configuration.speedBoostRefreshTime - (now - currentPlayer.lastSpeedBoost);
+
+    if (configuration.speedBoostEnabled === true && timeTillRefesh <= 0) {
+      currentPlayer.speedBoostTill = now + configuration.speedBoostDurationTime;
+      currentPlayer.lastSpeedBoost = now;
+    }
+  });
+
   socket.on('playerSplit', function (player) {
     var nodes       = currentPlayer.nodes,
         returnNodes = [],
@@ -694,15 +712,28 @@ function sendUpdates() {
     }
 
     sockets[u.id].emit('serverTellPlayerMove', uClone, visibleEnemies, visibleFood);
-
     if (leaderboardChanged) {
       sockets[u.id].emit('leaderboard', {
         players:     users.length,
         leaderboard: leaderboard
       });
     }
+
+    if (configuration.speedBoostEnabled === true) {
+      var now = new Date().getTime(),
+          timeTillRefesh = Math.round((configuration.speedBoostRefreshTime - (now - u.lastSpeedBoost)) / 1000),
+          msg            = "Press 's' for Speeed Boost!";
+
+      if (timeTillRefesh > 0) {
+        msg = "Speed Boost in " + timeTillRefesh;
+      }
+      sockets[u.id].emit('speedBoostTimer', msg);
+    } else {
+      sockets[u.id].emit('speedBoostTimer', "", true);
+    }
   });
   leaderboardChanged = false;
+
 }
 
 setInterval(moveloop, 1000 / 60);

@@ -19,5 +19,9 @@
     "maxNodes":                 16,
     "minSplitMass":             2,
     "releaseTime":              20000,
-    "radiusInUnitSquare":       0.5
+    "radiusInUnitSquare":       0.5,
+    "speedBoostEnabled":        true,
+    "speedBoostRefreshTime":    10000,
+    "speedBoostDurationTime":   1000,
+    "speedBoostMultiplier":     3
 }
