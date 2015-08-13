@@ -31,12 +31,13 @@ function addFood(toAdd) {
 
     food.push({
       // make ids unique
-      id:     ((new Date()).getTime() + '' + food.length) >>> 0,
-      x:      position.x,
-      y:      position.y,
-      radius: radius,
-      mass:   Math.random() + 2,
-      color:  util.randomColor()
+      id:           ((new Date()).getTime() + '' + food.length) >>> 0,
+      x:            position.x,
+      y:            position.y,
+      radius:       radius,
+      randomOffset: Math.random(),
+      mass:         Math.random() + 2,
+      color:        util.randomColor()
     });
   }
 }
@@ -272,6 +273,7 @@ io.on('connection', function (socket) {
 
   socket.on('gotit', function (player) {
     console.log('Player ' + player.id + ' connecting');
+    util.updatePlayerViableXandY(player);
 
     if (util.findIndex(users, player.id) > -1) {
       console.log('That playerID is already connected, kicking');
@@ -306,8 +308,8 @@ io.on('connection', function (socket) {
       io.emit('playerJoin', { name: currentPlayer.name });
 
       socket.emit('gameSetup', {
-        gameWidth: configuration.gameWidth,
-        gameHeight: configuration.gameHeight,
+        gameWidth:     configuration.gameWidth,
+        gameHeight:    configuration.gameHeight,
         currentPlayer: player
       });
       console.log('Total player: ' + users.length);
@@ -319,8 +321,9 @@ io.on('connection', function (socket) {
   });
 
   socket.on('windowResized', function (data) {
-    currentPlayer.screenWidth = data.screenWidth;
+    currentPlayer.screenWidth  = data.screenWidth;
     currentPlayer.screenHeight = data.screenHeight;
+    util.updatePlayerViableXandY(currentPlayer);
   });
 
   socket.on('respawn', function () {
@@ -618,10 +621,10 @@ function gameloop() {
 function sendUpdates() {
   users.forEach( function(u) {
     var visibleFood = food.map(function(f) {
-                        if (f.x > u.x - u.screenWidth / 2 - 20 &&
-                          f.x < u.x + u.screenWidth / 2 + 20 &&
-                          f.y > u.y - u.screenHeight / 2 - 20 &&
-                          f.y < u.y + u.screenHeight / 2 + 20) {
+                        if (f.x > u.x - ((u.screenWidth / 2) / u.distToPixs) - 20 &&
+                          f.x < u.x + ((u.screenWidth / 2) / u.distToPixs) + 20 &&
+                          f.y > u.y - ((u.screenHeight / 2) / u.distToPixs) - 20 &&
+                          f.y < u.y + ((u.screenHeight / 2) / u.distToPixs) + 20) {
                           return f;
                         }
                       }).filter(function(f) { return f; });
@@ -632,12 +635,13 @@ function sendUpdates() {
                            for (var i = 0; i < f.nodes.length; i++) {
                              var fnode = f.nodes[i];
                              for (var j = 0; j < u.nodes.length; j++) {
-                               var unode = u.nodes[j];
-                               if (f.id !== u.id &&
-                                 fnode.x > unode.x - u.screenWidth / 2 - 20 &&
-                                 fnode.x < unode.x + u.screenWidth / 2 + 20 &&
-                                 fnode.y > unode.y - u.screenHeight / 2 - 20 &&
-                                 fnode.y < unode.y + u.screenHeight / 2 + 20) {
+                               var unode       = u.nodes[j],
+                                   overXLeft   = fnode.x + fnode.radius > unode.x - ((u.screenWidth / 2) / u.distToPixs) - 20,
+                                   underXRight = fnode.x - fnode.radius < unode.x + ((u.screenWidth / 2) / u.distToPixs) + 20,
+                                   underYTop   = fnode.y + fnode.radius > unode.y - ((u.screenHeight / 2) / u.distToPixs) - 20,
+                                   overYBottom = fnode.y - fnode.radius < unode.y + ((u.screenHeight / 2) / u.distToPixs) + 20;
+
+                               if (f.id !== u.id && ((overXLeft || underXRight) && (underYTop || overYBottom))) {
                                  if (fclone === undefined) {
                                    fclone = {
                                      id: f.id,
@@ -667,13 +671,15 @@ function sendUpdates() {
     util.updatePlayerXandY(u);
 
     var uClone = {
-      id:    u.id,
-      nodes: [],
-      x:     Math.round(u.x),
-      y:     Math.round(u.y),
-      mass:  Math.round(u.mass),
-      hue:   u.hue,
-      name:  u.name
+      id:         u.id,
+      nodes:      [],
+      x:          Math.round(u.x),
+      y:          Math.round(u.y),
+      unitPixs:   u.unitPixs,
+      distToPixs: u.distToPixs,
+      mass:       Math.round(u.mass),
+      hue:        u.hue,
+      name:       u.name
     };
 
     for (var i = 0; i < u.nodes.length; i++) {

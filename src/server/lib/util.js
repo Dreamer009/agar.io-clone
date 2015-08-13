@@ -1,7 +1,7 @@
 /* jslint node: true */
 'use strict';
 
-var cfg = require('../../../config.json');
+var configuration = require('../../../config.json');
 
 exports.validNick = function(nickname) {
   var regex = /^\w*$/;
@@ -33,8 +33,8 @@ function genPos(from, to) {
 // generate a random position within the field of play
 exports.randomPosition = function (radius) {
   return {
-    x: genPos(radius, cfg.gameWidth - radius),
-    y: genPos(radius, cfg.gameHeight - radius)
+    x: genPos(radius, configuration.gameWidth - radius),
+    y: genPos(radius, configuration.gameHeight - radius)
   };
 };
 
@@ -101,6 +101,7 @@ exports.addMassToNodeAndUpdatePlayer = function(player, node, nodeMassIncrease) 
 exports.updatePlayer = function(player) {
   exports.updatePlayerMass(player);
   exports.updatePlayerXandY(player);
+  exports.updatePlayerViableXandY(player);
 };
 
 exports.updatePlayerMass = function(player) {
@@ -130,4 +131,18 @@ exports.updatePlayerXandY = function(player) {
   }
   player.x = tempx / player.nodes.length;
   player.y = tempy / player.nodes.length;
+};
+
+exports.updatePlayerViableXandY = function(player) {
+  var screenArea,
+      screenUnit,
+      unitPixs,
+      xGridPixs,
+      yGridPixs;
+
+  screenUnit = (player.screenWidth * player.screenHeight) / configuration.viewableArea;
+  unitPixs   = Math.sqrt(screenUnit);
+
+  player.distToPixs = unitPixs / (exports.massToRadius(player.mass) * configuration.radiusInUnitSquare);
+  player.unitPixs   = unitPixs;
 };

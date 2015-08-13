@@ -39,6 +39,10 @@ function validNick() {
   return regex.exec(playerNameInput.value) !== null;
 }
 
+function toPixs(serverUnits) {
+  return serverUnits * currentPlayer.distToPixs;
+}
+
 window.onload = function() {
   var btn           = document.getElementById('startButton'),
       nickErrorText = document.querySelector('#startMenu .input-error'),
@@ -479,12 +483,14 @@ function setupSocket(socket) {
       });
     }
 
-    currentPlayer.nodes = returnNodes;
-    currentPlayer.x     = updatedPlayer.x;
-    currentPlayer.y     = updatedPlayer.y;
-    currentPlayer.mass  = updatedPlayer.mass;
-    xoffset             = isNaN(current_xoffset) ? 0 : current_xoffset;
-    yoffset             = isNaN(current_yoffset) ? 0 : current_yoffset;
+    currentPlayer.nodes      = returnNodes;
+    currentPlayer.x          = updatedPlayer.x;
+    currentPlayer.y          = updatedPlayer.y;
+    currentPlayer.unitPixs   = updatedPlayer.unitPixs;
+    currentPlayer.distToPixs = updatedPlayer.distToPixs;
+    currentPlayer.mass       = updatedPlayer.mass;
+    xoffset                  = isNaN(current_xoffset) ? 0 : current_xoffset;
+    yoffset                  = isNaN(current_yoffset) ? 0 : current_yoffset;
 
     // console.log("currentPlayer");
     // console.log(currentPlayer);
@@ -516,7 +522,7 @@ function setupSocket(socket) {
   });
 }
 
-function drawCircle(centerX, centerY, radius, sides) {
+function drawCircle(centerX, centerY, radius, sides, offset) {
   var theta = 0,
       x     = 0,
       y     = 0;
@@ -524,7 +530,7 @@ function drawCircle(centerX, centerY, radius, sides) {
   graph.beginPath();
 
   for (var i = 0; i < sides; i++) {
-    theta = (i / sides) * 2 * Math.PI;
+    theta = ((i + offset) / sides) * 2 * Math.PI;
     x     = centerX + radius * Math.sin(theta);
     y     = centerY + radius * Math.cos(theta);
     graph.lineTo(x, y);
@@ -539,7 +545,7 @@ function drawFood(food) {
   graph.strokeStyle = food.color.border || foodConfig.borderColor;
   graph.fillStyle   = food.color.fill || foodConfig.fillColor;
   graph.lineWidth   = foodConfig.border;
-  drawCircle(food.x - currentPlayer.x + screenWidth / 2, food.y - currentPlayer.y + screenHeight / 2, food.radius, 9);
+  drawCircle(toPixs(food.x - currentPlayer.x) + (screenWidth / 2), toPixs(food.y - currentPlayer.y) + (screenHeight / 2), toPixs(food.radius), 6, food.randomOffset);
 }
 
 function drawPlayer() {
@@ -568,19 +574,24 @@ function drawNode(player, node, config) {
       xstore   = [],
       ystore   = [],
       fontSize,
+      halfScreenWidth  = (screenWidth / 2),
+      halfScreenHeight = (screenHeight / 2),
       xValues = [
-        -node.x - currentPlayer.x + screenWidth / 2 + (node.radius / 3),
-        gameWidth - node.x + gameWidth - currentPlayer.x + screenWidth / 2 - (node.radius / 3)
+        halfScreenWidth + toPixs(-node.x - currentPlayer.x + (node.radius / 3)),
+        halfScreenWidth + toPixs(gameWidth - node.x + gameWidth  - currentPlayer.x + (node.radius / 3))
       ],
       yValues = [
-        -node.y - currentPlayer.y + screenHeight / 2 + (node.radius / 3),
-        gameHeight - node.y + gameHeight - currentPlayer.y + screenHeight / 2 - (node.radius / 3)
+        halfScreenHeight + toPixs(-node.y - currentPlayer.y + (node.radius / 3)),
+        halfScreenHeight + toPixs(gameWidth - node.y + gameWidth  - currentPlayer.y + (node.radius / 3))
       ],
       circle = {
-        x: node.x - currentPlayer.x + screenWidth / 2,
-        y: node.y - currentPlayer.y + screenHeight / 2
+        x: toPixs(node.x - currentPlayer.x) + halfScreenWidth,
+        y: toPixs(node.y - currentPlayer.y) + halfScreenHeight
       };
-
+  // console.log("currentPlayer");
+  // console.log(currentPlayer);
+  // console.log("node");
+  // console.log(node);
   // console.log("xValues");
   // console.log(xValues);
   // console.log("yValues");
@@ -593,8 +604,8 @@ function drawNode(player, node, config) {
   spin += 0.0;
 
   for (var i = 0; i < points; i++) {
-    x = node.radius * Math.cos(spin) + circle.x;
-    y = node.radius * Math.sin(spin) + circle.y;
+    x = toPixs(node.radius) * Math.cos(spin) + circle.x;
+    y = toPixs(node.radius) * Math.sin(spin) + circle.y;
     x = valueInRange(xValues[0], xValues[1], x);
     y = valueInRange(yValues[0], yValues[1], y);
 
@@ -623,7 +634,8 @@ function drawNode(player, node, config) {
   graph.fill();
   graph.stroke();
 
-  fontSize           = (node.radius / 2);
+  fontSize           = toPixs(15);
+  // fontSize           = toPixs(node.radius / 2);
   graph.lineWidth    = config.textBorderSize;
   graph.miterLimit   = 1;
   graph.lineJoin     = 'round';
@@ -647,19 +659,34 @@ function valueInRange(min, max, value) {
 }
 
 function drawgrid() {
+  var gameWidthPixs    = toPixs(gameWidth),
+      gameHeightPixs   = toPixs(gameHeight),
+      playerXPixs      = toPixs(currentPlayer.x),
+      playerYPixs      = toPixs(currentPlayer.y),
+      halfScreenWidth  = (screenWidth / 2),
+      halfScreenHeight = (screenHeight / 2),
+      xCord,
+      yCord;
+
   graph.lineWidth   = 1;
   graph.strokeStyle = '#000';
   graph.globalAlpha = 0.15;
   graph.beginPath();
 
-  for (var x = xoffset - currentPlayer.x; x < screenWidth; x += screenHeight / 18) {
-    graph.moveTo(x, 0);
-    graph.lineTo(x, screenHeight);
+  // for (var x = 0; x < gameWidthPixs + halfScreenWidth; x += currentPlayer.unitPixs) {
+  //   xCord = Math.round(x - playerXPixs);
+  //
+  //   if (xCord >= 0 || xCoes)
+  for (var x = xoffset - currentPlayer.x ; x < screenWidth + halfScreenWidth; x += currentPlayer.unitPixs) {
+    xCord = Math.round(x);
+    graph.moveTo(xCord, 0);
+    graph.lineTo(xCord, screenHeight);
   }
 
-  for (var y = yoffset - currentPlayer.y ; y < screenHeight; y += screenHeight / 18) {
-    graph.moveTo(0, y);
-    graph.lineTo(screenWidth, y);
+  for (var y = yoffset - currentPlayer.y ; y < screenHeight + halfScreenWidth; y += currentPlayer.unitPixs) {
+    yCord = Math.round(y);
+    graph.moveTo(0, yCord);
+    graph.lineTo(screenWidth, yCord);
   }
 
   graph.stroke();
@@ -667,55 +694,62 @@ function drawgrid() {
 }
 
 function drawborder() {
+  var halfScreenWidth           = (screenWidth / 2),
+      halfScreenHeight          = (screenHeight / 2),
+      playerXPixs               = toPixs(currentPlayer.x),
+      playerYPixs               = toPixs(currentPlayer.y),
+      halfScreenWidthPlusDelta  = halfScreenWidth + toPixs(gameWidth - currentPlayer.x),
+      halfScreenHeightPlusDelta = halfScreenHeight + toPixs(gameHeight - currentPlayer.y);
+
   graph.strokeStyle = playerConfig.borderColor;
 
   // Left-vertical
-  if (currentPlayer.x <= screenWidth / 2) {
+  if (playerXPixs <= halfScreenWidth) {
     graph.beginPath();
-    graph.moveTo(screenWidth / 2 - currentPlayer.x, 0 ? currentPlayer.y > screenHeight / 2 : screenHeight / 2 - currentPlayer.y);
-    graph.lineTo(screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
+    graph.moveTo(halfScreenWidth - playerXPixs, 0 ? playerYPixs > halfScreenHeight : halfScreenHeight - playerYPixs);
+    graph.lineTo(halfScreenWidth - playerXPixs,  halfScreenHeightPlusDelta);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Top-horizontal
-  if (currentPlayer.y <= screenHeight / 2) {
+  if (playerYPixs <= halfScreenHeight) {
     graph.beginPath();
-    graph.moveTo(0 ? currentPlayer.x > screenWidth / 2 : screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
-    graph.lineTo(gameWidth + screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
+    graph.moveTo(0 ? playerXPixs > halfScreenWidth : halfScreenWidth - playerXPixs, halfScreenHeight - playerYPixs);
+    graph.lineTo(halfScreenWidthPlusDelta, halfScreenHeight - playerYPixs);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Right-vertical
-  if (gameWidth - currentPlayer.x <= screenWidth / 2) {
+  if (gameWidth - currentPlayer.x <= halfScreenWidth) {
     graph.beginPath();
-    graph.moveTo(gameWidth + screenWidth / 2 - currentPlayer.x, screenHeight / 2 - currentPlayer.y);
-    graph.lineTo(gameWidth + screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
+    graph.moveTo(halfScreenWidthPlusDelta, halfScreenHeight - playerYPixs);
+    graph.lineTo(halfScreenWidthPlusDelta, halfScreenHeightPlusDelta);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 
   // Bottom-horizontal
-  if (gameHeight - currentPlayer.y <= screenHeight / 2) {
+  if (toPixs(gameHeight - currentPlayer.y) <= halfScreenHeight) {
     graph.beginPath();
-    graph.moveTo(gameWidth + screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
-    graph.lineTo(screenWidth / 2 - currentPlayer.x, gameHeight + screenHeight / 2 - currentPlayer.y);
+    graph.moveTo(halfScreenWidthPlusDelta, halfScreenHeightPlusDelta);
+    graph.lineTo(halfScreenWidth - playerXPixs, halfScreenHeightPlusDelta);
     graph.strokeStyle = '#000000';
     graph.stroke();
   }
 }
 
 function gameInput(mouse) {
-  target.x = mouse.clientX - screenWidth / 2;
-  target.y = mouse.clientY - screenHeight / 2;
+  target.x = (mouse.clientX - screenWidth / 2) / currentPlayer.distToPixs;
+  target.y = (mouse.clientY - screenHeight / 2) / currentPlayer.distToPixs;
 }
 
 function touchInput(touch) {
   touch.preventDefault();
   touch.stopPropagation();
-  target.x = touch.touches[0].clientX - screenWidth / 2;
-  target.y = touch.touches[0].clientY - screenHeight / 2;
+  target.x = (touch.touches[0].clientX - screenWidth / 2) / currentPlayer.distToPixs;
+  target.y = (touch.touches[0].clientY - screenHeight / 2) / currentPlayer.distToPixs;
 }
 
 window.requestAnimFrame = (function() {

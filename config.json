@@ -4,6 +4,7 @@
     "defaultPlayerMass":        10,
     "gameWidth":                5000,
     "gameHeight":               5000,
+    "viewableArea":             324,
     "adminPass":                "skynet",
     "gameMass":                 20000,
     "maxFood":                  1500,
@@ -17,5 +18,6 @@
     "massLossRate":             10,
     "maxNodes":                 16,
     "minSplitMass":             2,
-    "releaseTime":              20000
+    "releaseTime":              20000,
+    "radiusInUnitSquare":       0.5
 }
