@@ -315,12 +315,12 @@ io.on('connection', function (socket) {
       }];
       player.target.x = player.x;
       player.target.y = player.y;
-      util.updatePlayer(player);
-      console.log("player");
-      console.log(player);
       currentPlayer = player;
       currentPlayer.lastHeartbeat  = new Date().getTime();
       currentPlayer.lastSpeedBoost = new Date().getTime();
+      util.updatePlayer(player);
+      console.log("player");
+      console.log(player);
       users.push(currentPlayer);
 
       io.emit('playerJoin', { name: currentPlayer.name });
@@ -345,8 +345,9 @@ io.on('connection', function (socket) {
   });
 
   socket.on('respawn', function () {
-    if (util.findIndex(users, currentPlayer.id) > -1)
-    users.splice(util.findIndex(users, currentPlayer.id), 1);
+    if (util.findIndex(users, currentPlayer.id) > -1) {
+      users.splice(util.findIndex(users, currentPlayer.id), 1);
+    }
     socket.emit('welcome', currentPlayer, false);
     console.log('User #' + currentPlayer.id + ' respawned');
   });
@@ -460,7 +461,7 @@ io.on('connection', function (socket) {
         deltaY = Math.sin(deg);
         deltaX = Math.cos(deg);
 
-        if (node.mass > configuration.minSplitMass && returnNodes.length < configuration.maxNodes - 1) {
+        if (node.mass >= configuration.minSplitMass && returnNodes.length < configuration.maxNodes - 1) {
           splitMass = Math.round(node.mass / 2);
 
           returnNodes.push({
@@ -484,8 +485,18 @@ io.on('connection', function (socket) {
             splitBoostTill: splitBoostTill
           });
         } else {
-          return;
+          returnNodes.push({
+            x:              node.x,
+            y:              node.y,
+            mass:           node.mass,
+            radius:         node.radius,
+            releaseTime:    node.releaseTime,
+            splitBoostTill: node.splitBoostTill
+          });
         }
+      }
+      if (nodes.length >= returnNodes.length) {
+        return;
       }
       currentPlayer.nodes = returnNodes;
     }
