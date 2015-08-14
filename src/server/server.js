@@ -75,7 +75,8 @@ function moveNode(player, node, playerCircles, index) {
       dy       = player.target.y - (node.y - player.y),
       dist     = Math.sqrt(Math.pow(dy, 2) + Math.pow(dx, 2)),
       deg      = Math.atan2(dy, dx),
-      slowDown = util.log(node.mass, configuration.slowBase) - initMassLog + 1,
+      // slowDown = util.log(node.mass, configuration.slowBase) - initMassLog + 1,
+      slowDown = Math.log(node.mass),
       speedY   = player.speed,
       speedX   = player.speed,
       deltaY,
@@ -482,6 +483,8 @@ io.on('connection', function (socket) {
             releaseTime:    releaseTime,
             splitBoostTill: splitBoostTill
           });
+        } else {
+          return;
         }
       }
       currentPlayer.nodes = returnNodes;

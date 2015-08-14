@@ -643,8 +643,7 @@ function drawNode(player, node, config) {
   graph.fill();
   graph.stroke();
 
-  fontSize           = toPixs(15);
-  // fontSize           = toPixs(node.radius / 2);
+  fontSize           = toPixs((node.radius * 0.8) / 2);
   graph.lineWidth    = config.textBorderSize;
   graph.miterLimit   = 1;
   graph.lineJoin     = 'round';
@@ -668,12 +667,12 @@ function valueInRange(min, max, value) {
 }
 
 function drawgrid() {
-  var gameWidthPixs    = toPixs(gameWidth),
-      gameHeightPixs   = toPixs(gameHeight),
-      playerXPixs      = toPixs(currentPlayer.x),
-      playerYPixs      = toPixs(currentPlayer.y),
-      halfScreenWidth  = (screenWidth / 2),
-      halfScreenHeight = (screenHeight / 2),
+  var gameWidthPixs        = toPixs(gameWidth),
+      gameHeightPixs       = toPixs(gameHeight),
+      playerXPixs          = toPixs(currentPlayer.x),
+      playerYPixs          = toPixs(currentPlayer.y),
+      halfScreenWidthPixs  = (screenWidth / 2),
+      halfScreenHeightPixs = (screenHeight / 2),
       xCord,
       yCord;
 
@@ -682,20 +681,22 @@ function drawgrid() {
   graph.globalAlpha = 0.15;
   graph.beginPath();
 
-  // for (var x = 0; x < gameWidthPixs + halfScreenWidth; x += currentPlayer.unitPixs) {
-  //   xCord = Math.round(x - playerXPixs);
-  //
-  //   if (xCord >= 0 || xCoes)
-  for (var x = xoffset - currentPlayer.x ; x < screenWidth + halfScreenWidth; x += currentPlayer.unitPixs) {
-    xCord = Math.round(x);
-    graph.moveTo(xCord, 0);
-    graph.lineTo(xCord, screenHeight);
+  for (var x = 0; x < gameWidthPixs + screenWidth; x += currentPlayer.unitPixs) {
+    xCord = Math.round(x - playerXPixs);
+
+    if (xCord >= -halfScreenWidthPixs || xCord <= halfScreenWidthPixs) {
+      graph.moveTo(xCord, 0);
+      graph.lineTo(xCord, screenHeight);
+    }
   }
 
-  for (var y = yoffset - currentPlayer.y ; y < screenHeight + halfScreenWidth; y += currentPlayer.unitPixs) {
-    yCord = Math.round(y);
-    graph.moveTo(0, yCord);
-    graph.lineTo(screenWidth, yCord);
+  for (var y = 0; y < gameHeightPixs + screenHeight; y += currentPlayer.unitPixs) {
+    yCord = Math.round(y - playerYPixs);
+
+    if (yCord >= -halfScreenHeightPixs || yCord <= halfScreenHeightPixs) {
+      graph.moveTo(0, yCord);
+      graph.lineTo(screenWidth, yCord);
+    }
   }
 
   graph.stroke();
@@ -731,7 +732,7 @@ function drawborder() {
   }
 
   // Right-vertical
-  if (gameWidth - currentPlayer.x <= halfScreenWidth) {
+  if (toPixs(gameWidth - currentPlayer.x) <= halfScreenWidth) {
     graph.beginPath();
     graph.moveTo(halfScreenWidthPlusDelta, halfScreenHeight - playerYPixs);
     graph.lineTo(halfScreenWidthPlusDelta, halfScreenHeightPlusDelta);
